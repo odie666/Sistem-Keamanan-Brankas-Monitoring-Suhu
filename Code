@@ -1,0 +1,88 @@
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+
+// Alamat I2C diubah ke 0x26 sesuai tampilan Tinkercad kamu
+LiquidCrystal_I2C lcd(0x26, 16, 2); 
+Servo myServo;
+
+// Definisi Pin
+const int pinLEDMerah = 8;
+const int pinLEDHijau = 13;
+const int pinServo = 9;
+const int pinPotensio = A0;
+const int pinSuhu = A1;
+
+// Pin Motor Driver L293D
+const int pinENA = 5;  
+const int pinIN1 = 4;  
+const int pinIN2 = 3;  
+
+void setup() {
+  pinMode(pinLEDMerah, OUTPUT);
+  pinMode(pinLEDHijau, OUTPUT);
+  pinMode(pinENA, OUTPUT);
+  pinMode(pinIN1, OUTPUT);
+  pinMode(pinIN2, OUTPUT);
+  
+  myServo.attach(pinServo);
+  
+  lcd.init();
+  lcd.backlight();
+  
+  // Tampilan Awal (Brankas System)
+  lcd.setCursor(0, 0);
+  lcd.print("  SISTEM AMAN  ");
+  lcd.setCursor(0, 1);
+  lcd.print(" BRANKAS AKTIF ");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  // 1. Monitoring Suhu Brankas
+  int dataSuhu = analogRead(pinSuhu);
+  float tegangan = dataSuhu * (5.0 / 1023.0);
+  float celsius = (tegangan - 0.5) * 100;
+
+  // 2. Kontrol Keamanan (Servo via Potensio)
+  int dataPot = analogRead(pinPotensio);
+  int sudutServo = map(dataPot, 0, 1023, 0, 180);
+  myServo.write(sudutServo);
+
+  // 3. Logika Overheat (Kipas Nyala jika Suhu > 35C)
+  if (celsius > 35.0) {
+    digitalWrite(pinIN1, HIGH);
+    digitalWrite(pinIN2, LOW);
+    analogWrite(pinENA, 255); 
+    digitalWrite(pinLEDMerah, HIGH); // Indikator Bahaya/Panas
+  } else {
+    digitalWrite(pinIN1, LOW);
+    digitalWrite(pinIN2, LOW);
+    analogWrite(pinENA, 0);
+    digitalWrite(pinLEDMerah, LOW);
+  }
+
+  // 4. Indikator Status Brankas (LED Hijau nyala jika terbuka)
+  if (sudutServo > 90) {
+    digitalWrite(pinLEDHijau, HIGH);
+  } else {
+    digitalWrite(pinLEDHijau, LOW);
+  }
+
+  // 5. Update Tampilan Monitoring LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Suhu: ");
+  lcd.print(celsius, 1);
+  lcd.print((char)223); // Simbol derajat
+  lcd.print("C  ");
+
+  lcd.setCursor(0, 1);
+  if (sudutServo > 90) {
+    lcd.print("Status: TERBUKA ");
+  } else {
+    lcd.print("Status: TERKUNCI");
+  }
+
+  delay(200); 
+}
